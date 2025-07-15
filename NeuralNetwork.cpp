@@ -13,9 +13,9 @@ class NeuralNetwork {
 private:
 	int layers; //count of the number of layers in the Neural Network
 	vector<vector<double>> activations; //activations[i][j] = activation of jth node of ith layer
-	vector<vector<double>> biases; //biases[i][j] = bias of jth node of ith layer; It is undefined for the input layer
+	vector<vector<double>> biases; //biases[i][j] = bias of jth node of ith layer; It is UNDEFINED (as verified from muliple sources) for the input layer
 	vector<vector<double>> z; //z[i][j] = Summation(weight * activPrev) + bias = z-val of jth node of ith layer; z-val for the first layer is undefined
-	vector<vector<double>> deltas;
+	vector<vector<double>> deltas; //deltas[i][j] = delta value of the jth node of the ith layer. UNDEFINED for the input layer. deltas are coefficients. Delta of a node when multiplied by the activation of any prev-layer node gives dC/dw. C: Cost, w: weight between the current node and the prev-layer node. It is equal to dC/dbias.
 	vector<vector<vector<double>>> weights; //weights[i][j][k] = weight of the edge from node j (ith layer) to node k (i+1 th layer)
 	vector<int> countOfNodesInLayers;
 
@@ -31,8 +31,8 @@ public:
 
 		//Initialize biases, z, deltas. They have the same dimensions as weights
 		biases = z = deltas = activations;
-		randomizeValues(biases);
 		randomizeValues(z);
+		//biases are generally initialized with zeroes.
 		//deltas need not be initialized
 		
 		//Initialize weights
@@ -69,31 +69,12 @@ public:
 	void randomizeValues(vector<double>& arr) {
 		for (double& x: arr) x = dist(gen);
 	}
-
 	void randomizeValues(vector<vector<double>>& arr) {
 		for (vector<double>& x: arr) randomizeValues(x);
 	}
-
 	void randomizeValues(vector<vector<vector<double>>>& arr) {
 		for (vector<vector<double>>& x: arr) randomizeValues(x);
 	}
-
-	/*
-	void dotProd(vector<double>& ip, vector<vector<double>>& weights, vector<double>& op) {
-		//obsolete
-		if (ip.size() != weights[0].size()) {
-			cout << "Illegal Dot Product!";
-			return;
-		}
-		for (int opLayerNode = 0; opLayerNode < op.size(); opLayerNode++) {
-			double temp = 0;
-			for (int ipLayerNode = 0; ipLayerNode < ip.size(); ipLayerNode++)
-				temp += weights[opLayerNode][ipLayerNode] * ip[ipLayerNode];
-			op[opLayerNode] = temp;
-		}
-	}
-	*/
-
 	double ReLU(double input) {
 		return max((double)0, input);
 	}
@@ -106,13 +87,10 @@ public:
 	double sqFuncDiff(double expected, double actual) {
 		return (expected - actual) * 2;
 	}
-
-	double activFunc(double input) {
-		//Activation Function
+	double activFunc(double input) {//Activation Function
 		return ReLU(input);
 	}
-	double activFuncDiff(double input) {
-		//differentiation of the Activation Function
+	double activFuncDiff(double input) {//differentiation of the Activation Function
 		return ReLUDiff(input);
 	}
 	double costFunc(double expected, double actual) {
@@ -125,33 +103,33 @@ public:
 public:
 	vector<double> processInput(vector<double> input) {
 		activations[0] = input;
-		for (int i=1; i<layers; i++) {
-			for (int j=0; j<activations[i].size(); i++) {
+		for (int l=1; l<layers; l++) {
+			for (int node2=0; node2<activations[l].size(); node2++) {
 				double temp = 0;
-				for (int k=0; k<activations[i-1].size(); k++) temp += weights[i-1][k][j] * activations[i-1][k];
-				z[i][j] = temp + biases[i][j];
-				activations[i][j] = activFunc(z[i][j]);
+				for (int node1=0; node1<activations[l-1].size(); node1++) temp += weights[l-1][node1][node2] * activations[l-1][node1];
+				z[l][node2] = temp + biases[l][node2];
+				activations[l][node2] = activFunc(z[l][node2]);
 			}
 		}
 		return activations.back();
 	}
 	void backPropagation(vector<double>& expectedValues) {
 		//initialize deltas for the last layer
-		for (int i=0; i<expectedValues.size(); i++)
-			 deltas[layers-1][i] = costFuncDiff(expectedValues[i], activations[layers-1][i]) * activFuncDiff(z[layers-1][i]);
+		for (int node=0; node<expectedValues.size(); node++)
+			 deltas[layers-1][node] = costFuncDiff(expectedValues[node], activations[layers-1][node]) * activFuncDiff(z[layers-1][node]);
 
 		//find for the rest of the layers
-		for (int i=layers-2; i>=0; i--) {
-			for (int node1 = 0; node1 < countOfNodesInLayers[i]; node1++) {
+		for (int l=layers-2; l>=0; l--) {
+			for (int node1 = 0; node1 < countOfNodesInLayers[l]; node1++) {
 				double temp = 0;
-				for (int node2 = 0; node2 < countOfNodesInLayers[i+1]; node2++) {
-					temp += weights[i][node1][node2] * deltas[i+1][node2];
+				for (int node2 = 0; node2 < countOfNodesInLayers[l+1]; node2++) {
+					temp += weights[l][node1][node2] * deltas[l+1][node2];
 				}
-				temp *= activFuncDiff(z[i][node1]);
-				deltas[i][node1] = temp;
+				temp *= activFuncDiff(z[l][node1]);
+				deltas[l][node1] = temp;
 			}
 		}
-
+		//verified till here
 	}
 	void showActivations() {
 		cout << "Printing Activations for each layer:\n";
